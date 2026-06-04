@@ -1,0 +1,38 @@
+# Credentials — JANGAN masuk image
+.env
+*.env
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# IoT device code (tidak dibutuhkan di dashboard)
+iot-code/
+
+# Script utility (tidak perlu di production)
+upload_dummy_data.py
+attack_simulator.py
+
+# Log lokal
+*.log
+mock_emails.log
+
+# Docs
+*.pdf
+README.md

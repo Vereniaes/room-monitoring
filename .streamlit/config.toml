@@ -1,0 +1,13 @@
+[server]
+# Cloud Run inject PORT env var — Streamlit baca dari sini
+port = 8080
+address = "0.0.0.0"
+headless = true
+
+# WebSocket stability di Cloud Run
+enableCORS = false
+enableXsrfProtection = false
+enableWebsocketCompression = false
+
+# Matikan file watcher (tidak perlu di container)
+runOnSave = false
