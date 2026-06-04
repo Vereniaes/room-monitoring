@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "author": "Vengatasan Vengatasan",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-pi-pico-w",
+      "id": "pico",
+      "top": 44.75,
+      "left": 291.55,
+      "attrs": { "env": "micropython-20241129-v1.24.1" }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr1",
+      "top": -44.8,
+      "left": 298.4,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -105.3,
+      "left": 90.6,
+      "attrs": { "humidity": "35", "temperature": "27.8" }
+    },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir1", "top": -92, "left": 184.62, "attrs": {} },
+    { "type": "wokwi-led", "id": "led1", "top": -51.6, "left": -5.8, "attrs": { "color": "red" } },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": 169.6,
+      "left": -90.4,
+      "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": -26.4,
+      "left": -142.2,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 71.15,
+      "left": 124.8,
+      "attrs": { "value": "1000" }
+    }
+  ],
+  "connections": [
+    [ "ldr1:VCC", "pico:3V3", "red", [ "h9.6", "v105.6" ] ],
+    [ "ldr1:GND", "pico:GND.8", "black", [ "h28.8", "v76.4" ] ],
+    [ "ldr1:AO", "pico:GP28", "green", [ "h19.2", "v104.9" ] ],
+    [ "led1:A", "r1:1", "green", [ "v0" ] ],
+    [ "r1:2", "pico:GP3", "purple", [ "v0" ] ],
+    [ "led1:C", "pico:GND.2", "green", [ "v0" ] ],
+    [ "bz1:2", "pico:GP6", "green", [ "v0" ] ],
+    [ "bz1:1", "pico:GND.2", "green", [ "v0" ] ],
+    [ "dht1:VCC", "pico:3V3", "red", [ "v0" ] ],
+    [ "dht1:GND", "pico:GND.2", "black", [ "v0" ] ],
+    [ "pir1:VCC", "pico:3V3", "red", [ "v38.4", "h182.4", "v48" ] ],
+    [ "pir1:OUT", "pico:GP4", "cyan", [ "v0" ] ],
+    [ "pir1:GND", "pico:GND.8", "black", [ "v28.8", "h182.14" ] ],
+    [ "lcd1:GND", "pico:GND.4", "black", [ "h336", "v76.8" ] ],
+    [ "lcd1:VCC", "pico:3V3", "red", [ "h-28.8", "v-38.3", "h374.4", "v115.2", "h153.6" ] ],
+    [ "lcd1:SDA", "pico:GP0", "green", [ "h-67.2", "v-67" ] ],
+    [ "lcd1:SCL", "pico:GP1", "green", [ "h-48", "v-153.3" ] ],
+    [ "dht1:SDA", "pico:GP5", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

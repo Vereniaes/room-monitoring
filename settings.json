@@ -1,0 +1,8 @@
+{
+    "recipient_email": "titasaripratiwi8@gmail.com",
+    "email_alerts_enabled": true,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": ""
+}
