@@ -7,6 +7,27 @@ import hashlib
 import pandas as pd
 import streamlit as st
 import requests
+from pathlib import Path
+
+# ======
+# Load konfigurasi InfluxDB Cloud dari .env
+# ======
+def _load_env():
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), val.strip())
+
+_load_env()
+
+INFLUXDB_URL    = os.environ.get("INFLUXDB_URL",    "")
+INFLUXDB_TOKEN  = os.environ.get("INFLUXDB_TOKEN",  "")
+INFLUXDB_ORG    = os.environ.get("INFLUXDB_ORG",    "")
+INFLUXDB_BUCKET = os.environ.get("INFLUXDB_BUCKET", "")
 
 # Menambahkan parent directory (folder root proyek) ke sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -70,40 +91,52 @@ def log_security_event(level, action, status, details):
 # =======
 
 # --- METODE MEMBACA DATA SENSOR ---
+@st.cache_data(ttl=60)
 def fetch_sensor_data():
     """
-    Mencoba mengambil data dari InfluxDB Docker.
-    Fallback ke file dummy lokal, lalu fallback ke data statis darurat.
+    Prioritas sumber data:
+    1. InfluxDB Cloud (primary) — query 7 hari terakhir
+    2. File dummy lokal        — fallback jika Cloud tidak tersedia
+    3. Data statis darurat     — fallback terakhir
     """
+    # --- 1. InfluxDB Cloud ---
+    if INFLUXDB_URL and INFLUXDB_TOKEN and INFLUXDB_ORG and INFLUXDB_BUCKET:
+        try:
+            from influxdb_client import InfluxDBClient
+            client = InfluxDBClient(
+                url=INFLUXDB_URL,
+                token=INFLUXDB_TOKEN,
+                org=INFLUXDB_ORG,
+                timeout=10_000
+            )
+            query = f'''
+            from(bucket: "{INFLUXDB_BUCKET}")
+              |> range(start: -30d)
+              |> filter(fn: (r) => r["_measurement"] == "smart_room")
+              |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+              |> keep(columns: ["_time", "suhu", "kelembaban", "cahaya", "gerakan", "daya_listrik", "lokasi"])
+              |> sort(columns: ["_time"])
+            '''
+            query_api = client.query_api()
+            df = query_api.query_data_frame(query)
+            client.close()
+
+            if not df.empty:
+                df = df.rename(columns={"_time": "time"})
+                df["time"] = pd.to_datetime(df["time"], utc=True).dt.tz_convert("Asia/Jakarta")
+                df["time"] = df["time"].dt.tz_localize(None)
+                for col in ["suhu", "kelembaban", "cahaya", "gerakan", "daya_listrik"]:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors="coerce")
+                df = df.dropna(subset=["suhu", "kelembaban"])
+                df = df.sort_values(by="time").reset_index(drop=True)
+                return df, "INFLUXDB_CLOUD"
+        except Exception:
+            pass
+
+    # --- 2. Fallback: file dummy lokal ---
     try:
-        from influxdb_client import InfluxDBClient
-        token = "ywmTlVCwtTlubc2BrDPVrOWKlEAvyZtbUbCvuJLhdRFYuoCP49L8fz7rdSeFuRvcBrjbRchcdXUkh5bVtzsYQA=="
-        org = "IOT"
-        bucket = "data_sensor"
-        client = InfluxDBClient(url="http://localhost:8086", token=token, org=org, timeout=3000)
-        
-        query = f'''
-        from(bucket: "{bucket}")
-          |> range(start: -7d)
-          |> filter(fn: (r) => r["_measurement"] == "smart_room")
-          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-          |> keep(columns: ["_time", "suhu", "kelembaban", "cahaya", "gerakan", "daya_listrik", "lokasi"])
-        '''
-        
-        query_api = client.query_api()
-        df = query_api.query_data_frame(query)
-        client.close()
-        
-        if not df.empty:
-            df = df.rename(columns={"_time": "time"})
-            df["time"] = pd.to_datetime(df["time"])
-            return df, "INFLUXDB_DOCKER"
-    except Exception:
-        pass
-    
-    # Fallback ke file dummy lokal
-    try:
-        lines = []
+        rows = []
         if os.path.exists(DUMMY_DB_FILE):
             with open(DUMMY_DB_FILE, "r") as f:
                 for line in f.readlines():
@@ -114,8 +147,7 @@ def fetch_sensor_data():
                             tags = dict(item.split("=") for item in meas_tags.split(",")[1:])
                             fields = dict(item.split("=") for item in fields_str.split(","))
                             ts = datetime.datetime.fromtimestamp(int(ts_str))
-                            
-                            row = {
+                            rows.append({
                                 "time": ts,
                                 "lokasi": tags.get("lokasi", "Ruang_Kelas_A"),
                                 "suhu": float(fields.get("suhu", 0)),
@@ -123,17 +155,15 @@ def fetch_sensor_data():
                                 "cahaya": float(fields.get("cahaya", 0)),
                                 "gerakan": float(fields.get("gerakan", 0)),
                                 "daya_listrik": float(fields.get("daya_listrik", 0))
-                            }
-                            lines.append(row)
-            
-            df_dummy = pd.DataFrame(lines)
+                            })
+            df_dummy = pd.DataFrame(rows)
             if not df_dummy.empty:
-                df_dummy = df_dummy.sort_values(by="time")
+                df_dummy = df_dummy.sort_values(by="time").reset_index(drop=True)
                 return df_dummy, "LOCAL_FILE_DUMMY"
     except Exception:
         pass
 
-    # Fallback emergency static
+    # --- 3. Fallback emergency static ---
     now = datetime.datetime.now()
     times = [now - datetime.timedelta(minutes=15*i) for i in range(100)]
     df_emergency = pd.DataFrame({
@@ -449,10 +479,10 @@ tab1, tab2, tab3 = st.tabs([
 # TAB 1: REAL-TIME MONITORING
 # ==========================================
 with tab1:
-    if data_source == "INFLUXDB_DOCKER":
-        st.success("⚡ **Database**: Data real-time dari **InfluxDB Docker** aktif!")
+    if data_source == "INFLUXDB_CLOUD":
+        st.success("☁️ **Database**: Data real-time dari **InfluxDB Cloud** aktif!")
     elif data_source == "LOCAL_FILE_DUMMY":
-        st.warning("⚠️ **Database**: InfluxDB offline — menampilkan data dummy 1 minggu.")
+        st.warning("⚠️ **Database**: InfluxDB Cloud tidak tersedia — menampilkan data dummy 1 minggu lokal.")
     else:
         st.error("🔴 **Database**: Semua sumber offline. Menampilkan data statis darurat.")
 
