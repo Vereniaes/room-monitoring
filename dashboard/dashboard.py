@@ -453,7 +453,6 @@ with st.sidebar:
                 pass
     else:
         st.error("🔴 API Gateway: Terputus")
-        st.caption("Jalankan `api_gateway.py` di terminal.")
     
 
     
