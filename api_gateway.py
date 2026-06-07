@@ -1,9 +1,26 @@
 import os
 import datetime
 import logging
+from pathlib import Path
 from flask import Flask, request, jsonify
 import requests
 from email_helper import send_email_alert
+
+# ======
+# Load konfigurasi dari .env (untuk development lokal)
+# Di Cloud Run, env var di-inject langsung via --set-env-vars
+# ======
+def _load_env():
+    env_file = Path(__file__).parent / ".env"
+    if env_file.exists():
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), val.strip())
+
+_load_env()
 
 app = Flask(__name__)
 
@@ -32,9 +49,16 @@ REGISTERED_DEVICE_ID = "PICO-W-CLASS-A"
 # DONE CHECKLIST A (Device Authentication)
 # =======
 
-# Konfigurasi InfluxDB Lokal (Forwarding Target)
-INFLUX_URL = "http://localhost:8086/api/v2/write?org=IOT&bucket=data_sensor&precision=s"
-INFLUX_TOKEN = "ywmTlVCwtTlubc2BrDPVrOWKlEAvyZtbUbCvuJLhdRFYuoCP49L8fz7rdSeFuRvcBrjbRchcdXUkh5bVtzsYQA=="
+# Konfigurasi InfluxDB Cloud (dibaca dari env var)
+# - INFLUXDB_URL    : https://us-east-1-1.aws.cloud2.influxdata.com
+# - INFLUXDB_TOKEN  : API token InfluxDB Cloud
+# - INFLUXDB_ORG    : nama organisasi
+# - INFLUXDB_BUCKET : nama bucket
+_influx_base = os.environ.get("INFLUXDB_URL", "").rstrip("/")
+_influx_org   = os.environ.get("INFLUXDB_ORG", "")
+_influx_bucket= os.environ.get("INFLUXDB_BUCKET", "")
+INFLUX_URL    = f"{_influx_base}/api/v2/write?org={_influx_org}&bucket={_influx_bucket}&precision=s"
+INFLUX_TOKEN  = os.environ.get("INFLUXDB_TOKEN", "")
 
 # --- STATE DATABASE DALAM MEMORI (IN-MEMORY) ---
 failed_attempts = {}    # {ip: count} — melacak percobaan gagal per IP

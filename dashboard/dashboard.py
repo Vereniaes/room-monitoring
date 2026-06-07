@@ -70,7 +70,7 @@ LOG_FILE = os.path.join(ROOT_DIR, "security_activity.log")
 SETTINGS_FILE = os.path.join(ROOT_DIR, "settings.json")
 DUMMY_DB_FILE = os.path.join(DASHBOARD_DIR, "data_sensor_1_minggu_lineprotocol.txt")
 
-GATEWAY_URL = "http://localhost:5000"
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://localhost:5000")
 
 # ======
 # CHECKLIST C: Activity Logging

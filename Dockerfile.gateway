@@ -1,0 +1,33 @@
+# ============================================================
+# Dockerfile.gateway — IoT API Gateway (Flask)
+# Target: Google Cloud Run (service terpisah dari dashboard)
+# ============================================================
+
+FROM python:3.11-slim
+
+LABEL maintainer="iot-unj"
+LABEL description="Smart Room IoT API Gateway — Flask security middleware"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements-gateway.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements-gateway.txt
+
+# Copy source
+COPY api_gateway.py    .
+COPY email_helper.py   .
+COPY settings.json     .
+
+# Log file placeholder
+RUN touch /app/security_activity.log
+
+EXPOSE 8080
+
+# Gunakan gunicorn untuk production (bukan Flask dev server)
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "60", "api_gateway:app"]
