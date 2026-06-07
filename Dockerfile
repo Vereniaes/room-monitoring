@@ -1,49 +1,44 @@
 # ============================================================
-# Dockerfile — IoT Smart Room Dashboard (Streamlit)
+# Dockerfile — IoT Smart Room (All-in-One)
+# -> Streamlit Dashboard  (port 8080, exposed ke Cloud Run)
+# -> API Gateway Flask    (port 5000, internal container)
 # Target: Google Cloud Run
 # ============================================================
 
-# --- Stage 1: Base image ---
 FROM python:3.11-slim
 
-# Metadata
 LABEL maintainer="iot-unj"
-LABEL description="Smart Room IoT Dashboard — Streamlit + InfluxDB Cloud"
+LABEL description="Smart Room IoT — Streamlit Dashboard + Flask API Gateway"
 
-# Env dasar
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    GATEWAY_URL=http://localhost:5000
 
 WORKDIR /app
 
-# --- Stage 2: Install dependencies ---
-# Copy requirements dulu (layer caching — jika requirements tidak berubah, layer ini di-cache)
+# --- Install dependencies (semua: streamlit + flask + gunicorn) ---
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
-# --- Stage 3: Copy source code ---
-# Copy file-file yang dibutuhkan dashboard
-COPY email_helper.py     .
-COPY settings.json       .
-COPY .streamlit/         .streamlit/
-COPY dashboard/dashboard.py          dashboard/dashboard.py
-COPY dashboard/data_sensor_1_minggu_lineprotocol.txt \
-     dashboard/data_sensor_1_minggu_lineprotocol.txt
+# --- Copy semua source code ---
+COPY email_helper.py        .
+COPY api_gateway.py         .
+COPY settings.json          .
+COPY start.sh               .
+COPY .streamlit/            .streamlit/
+COPY dashboard/dashboard.py                          dashboard/dashboard.py
+COPY dashboard/data_sensor_1_minggu_lineprotocol.txt dashboard/data_sensor_1_minggu_lineprotocol.txt
 
-# Pastikan folder log bisa ditulis (Cloud Run: ephemeral, tapi supaya tidak crash)
-RUN mkdir -p /app/logs && touch /app/security_activity.log
+# Buat log file & set permission start.sh
+RUN touch /app/security_activity.log \
+ && chmod +x /app/start.sh
 
-# --- Stage 4: Entrypoint ---
-# Credentials (INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET)
-# di-inject via Cloud Run --set-env-vars atau Secret Manager saat deploy.
-# JANGAN hardcode di sini.
+# Cloud Run expose 8080 ke publik
+# Gateway berjalan di :5000 (internal container, tidak di-expose)
 EXPOSE 8080
 
-CMD ["streamlit", "run", "dashboard/dashboard.py", \
-     "--server.port=8080", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--server.enableCORS=false", \
-     "--server.enableXsrfProtection=false"]
+# Credentials di-inject via env var saat deploy:
+# INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET
+CMD ["/bin/bash", "/app/start.sh"]
