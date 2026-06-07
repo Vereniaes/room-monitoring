@@ -33,9 +33,15 @@ password = ""  # Di produksi: "K@mpus_S3kur3_2026!" (WPA2 strong password)
 #   dengan payload {"sub": DEVICE_ID, "exp": timestamp+3600}
 # ======
 # --- KONFIGURASI API GATEWAY ---
-# Ganti URL ini dengan URL Pinggy terbaru yang mengarah ke port 5000
-GATEWAY_URL = "https://jupnh-110-138-83-110.run.pinggy-free.link"
-SECURE_TOKEN = "token_aman_smartroom_2026"  # Bearer Token 
+# Ganti URL ini dengan URL Cloud Run service yang sudah di-deploy
+GATEWAY_URL = "https://iot-dashboard-xxxx-ue.a.run.app"   # Update ke URL Cloud Run kamu
+SECURE_TOKEN = "token_aman_smartroom_2026"                 # Bearer Token
+
+# --- REFERENSI INFLUXDB CLOUD (dipakai oleh API Gateway, bukan langsung oleh device) ---
+# INFLUXDB_URL    = "https://us-east-1-1.aws.cloud2.influxdata.com"
+# INFLUXDB_ORG    = "iot-unj"
+# INFLUXDB_BUCKET = "sensor-data"
+# INFLUXDB_TOKEN  = "zeCUd_xlY8bcohatEvgLGj7nfHFGZJJRfYH_kAK7wWFwHK9cSy1GaygBgobGqanqBYkEmsDfWbDOFHOt0weMRQ=="
 # =======
 # DONE CHECKLIST A (API Security)
 # =======

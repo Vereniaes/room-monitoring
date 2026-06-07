@@ -26,10 +26,10 @@ password = ""  # Open network - tidak ada password WiFi (WPA2/WPA3 tidak aktif)
 # - Expired session token: TIDAK ADA
 # KONDISI: Data dikirim via HTTP biasa (rentan disadap / man-in-the-middle attack)
 # ======
-# 1. Menggunakan HTTP biasa (Bukan HTTPS - rentan disadap)
-INFLUX_URL = "http://xxxjg-203-17-85-134.run.pinggy-free.link/api/v2/write?org=IOT&bucket=data_sensor&precision=s"
+# 1. Mengirim ke InfluxDB Cloud dengan metode autentikasi yang salah (plain header)
+INFLUX_URL = "https://us-east-1-1.aws.cloud2.influxdata.com/api/v2/write?org=iot-unj&bucket=sensor-data&precision=s"
 
-# 2. Password Default yang sangat lemah (admin123) / Tanpa Token Valid
+# 2. Password Default yang sangat lemah - dikirim via header yang salah (bukan Authorization: Token)
 PASSWORD_DEFAULT = "admin123"
 # =======
 # DONE CHECKLIST A (API Security - NOT IMPLEMENTED - VULNERABLE)
