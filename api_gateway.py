@@ -26,6 +26,7 @@ app = Flask(__name__)
 
 # ======
 # CHECKLIST A: API Security
+
 # - API Key validation: SECURE_TOKEN divalidasi di setiap endpoint sensitif
 # - Bearer Token / JWT: Header Authorization: Bearer <token> wajib pada /write & /set_light
 # - Expired session token: Token statis (simulasi) — di produksi gunakan JWT dengan exp claim
