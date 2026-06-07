@@ -478,12 +478,6 @@ tab1, tab2, tab3 = st.tabs([
 # TAB 1: REAL-TIME MONITORING
 # ==========================================
 with tab1:
-    if data_source == "INFLUXDB_CLOUD":
-        st.success("☁️ **Database**: Data real-time dari **InfluxDB Cloud** aktif!")
-    elif data_source == "LOCAL_FILE_DUMMY":
-        st.warning("⚠️ **Database**: InfluxDB Cloud tidak tersedia — menampilkan data dummy 1 minggu lokal.")
-    else:
-        st.error("🔴 **Database**: Semua sumber offline. Menampilkan data statis darurat.")
 
     latest_row = df_sensor.iloc[-1]
 
