@@ -91,7 +91,7 @@ def log_security_event(level, action, status, details):
 # =======
 
 # --- METODE MEMBACA DATA SENSOR ---
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def fetch_sensor_data():
     """
     Prioritas sumber data:
@@ -407,6 +407,12 @@ if st.session_state["login_time"]:
     mins = int(elapsed.total_seconds() // 60)
     login_duration = f" | Sesi aktif: {mins} menit"
 
+# Auto-refresh halaman setiap 5 menit (300 detik)
+st.markdown(
+    """<meta http-equiv="refresh" content="300">""",
+    unsafe_allow_html=True
+)
+
 st.markdown(f"""
 <div style='display:flex; align-items:center; gap:1rem; padding:0.5rem 0 1rem 0; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:1rem;'>
     <span style='font-size:2rem;'>🛡️</span>
@@ -466,6 +472,13 @@ with st.sidebar:
 # --- AMBIL DATA SENSOR ---
 df_sensor, data_source = fetch_sensor_data()
 
+# Simpan waktu terakhir fetch ke session state
+if "last_data_fetch" not in st.session_state:
+    st.session_state["last_data_fetch"] = datetime.datetime.now()
+
+# Catat waktu fetch baru setiap kali cache expired & data di-reload
+fetch_time_str = st.session_state["last_data_fetch"].strftime("%d %b %Y, %H:%M:%S")
+
 # --- TAB DASHBOARD ---
 tab1, tab2, tab3 = st.tabs([
     "📈 Monitoring",
@@ -478,6 +491,10 @@ tab1, tab2, tab3 = st.tabs([
 # TAB 1: REAL-TIME MONITORING
 # ==========================================
 with tab1:
+
+    # --- Terakhir Diperbarui ---
+    st.caption(f"🔄 Terakhir diperbarui: **{fetch_time_str}** — otomatis refresh setiap 5 menit")
+    st.markdown("<hr style='margin:0.25rem 0 1rem 0; border-color:rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
 
     latest_row = df_sensor.iloc[-1]
 

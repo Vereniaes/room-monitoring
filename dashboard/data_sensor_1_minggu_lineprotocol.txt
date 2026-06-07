@@ -671,3 +671,7 @@ smart_room,lokasi=Ruang_Kelas_A suhu=30.2,kelembaban=74,cahaya=14988,gerakan=0,d
 smart_room,lokasi=Ruang_Kelas_A suhu=29.4,kelembaban=72,cahaya=18135,gerakan=0,daya_listrik=181.5 1780205400
 smart_room,lokasi=Ruang_Kelas_A suhu=30.4,kelembaban=74,cahaya=16559,gerakan=0,daya_listrik=253.3 1780206300
 smart_room,lokasi=Ruang_Kelas_A suhu=30.3,kelembaban=67,cahaya=13659,gerakan=0,daya_listrik=213.3 1780207200
+smart_room,lokasi=Ruang_Kelas_A suhu=25.7,kelembaban=80,cahaya=1768,gerakan=0,daya_listrik=244.9 1780873200
+smart_room,lokasi=Ruang_Kelas_A suhu=26.1,kelembaban=81,cahaya=2899,gerakan=0,daya_listrik=187.1 1780873500
+smart_room,lokasi=Ruang_Kelas_A suhu=26.1,kelembaban=80,cahaya=3526,gerakan=0,daya_listrik=193.9 1780873800
+smart_room,lokasi=Ruang_Kelas_A suhu=25.9,kelembaban=80,cahaya=4773,gerakan=0,daya_listrik=245.2 1780874100
