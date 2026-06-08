@@ -221,7 +221,8 @@ while True:
         headers = {
             "Authorization": "Bearer " + SECURE_TOKEN,  # ✅ Bearer Token Authentication
             "X-Device-ID": DEVICE_ID,                   # ✅ Device ID Validation
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Connection": "close"                        # ✅ Paksa server tutup koneksi → urequests tidak hang
         }
         json_payload = {"encrypted_data": encrypted_hex}
         # =======
