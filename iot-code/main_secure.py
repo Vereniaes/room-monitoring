@@ -232,7 +232,7 @@ while True:
         try:
             # ======
             # CHECKLIST B: HTTPS / SSL/TLS
-            # - Request dikirim ke HTTPS endpoint (Pinggy tunnel SSL/TLS)
+            # - Request dikirim ke HTTPS endpoint (Cloud Run SSL/TLS)
             # - Data dalam transit dilindungi enkripsi TLS end-to-end
             # ======
             res_write = requests.post(
