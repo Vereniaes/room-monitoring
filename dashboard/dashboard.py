@@ -34,25 +34,39 @@ INFLUXDB_BUCKET = os.environ.get("INFLUXDB_BUCKET", "")
 # ======
 # BACKGROUND DATA GENERATOR
 # -> generate + upload 1 data point tiap 5 menit ke InfluxDB Cloud
-# -> pola: gedung kosong (Minggu/libur) — gerakan=0, daya standby
+# -> pola dinamis berdasarkan hari & jam:
+#    - Senin-Jumat 07:00-17:00 : kelas aktif (daya tinggi, gerakan ada)
+#    - Senin-Jumat di luar jam  : gedung sepi (daya rendah)
+#    - Sabtu-Minggu             : gedung kosong (standby)
 # -> thread dimulai sekali saat container start (module-level lock)
 # ======
 
-_generator_lock   = threading.Lock()
+_generator_lock    = threading.Lock()
 _generator_started = False
 
-def _sensor_suhu(hour: float) -> float:
-    # Pagi mulai ~26°C, naik ~0.5°C per jam sampai siang
-    base = 26.0 + max(0, (hour - 6)) * 0.5
-    return round(min(35.0, base + random.uniform(-0.3, 0.3)), 1)
+def _is_active_hour(now: datetime.datetime) -> bool:
+    """True jika jam kuliah aktif: Senin-Jumat 07:00-17:00."""
+    return now.weekday() < 5 and 7 <= now.hour < 17
 
-def _sensor_kelembaban(hour: float) -> float:
-    # Pagi lembab ~82%, turun ke ~65% siang hari
-    base = 82 - max(0, (hour - 6)) * 1.8
-    return int(max(55, min(90, base + random.uniform(-2, 2))))
+def _sensor_suhu(hour: float, aktif: bool) -> float:
+    if aktif:
+        # Kelas aktif: AC lawan panas orang + elektronik
+        base = 28.0 + min(3.0, (hour - 7) * 0.3)
+        return round(base + random.uniform(-0.2, 0.3), 1)
+    else:
+        base = 26.0 + max(0, (hour - 6)) * 0.4
+        return round(min(34.0, base + random.uniform(-0.3, 0.3)), 1)
+
+def _sensor_kelembaban(hour: float, aktif: bool) -> float:
+    if aktif:
+        # AC ngurangin kelembaban
+        base = 68 - min(16, (hour - 7) * 1.6)
+        return int(max(48, min(72, base + random.uniform(-2, 2))))
+    else:
+        base = 82 - max(0, (hour - 6)) * 1.5
+        return int(max(55, min(88, base + random.uniform(-2, 2))))
 
 def _sensor_cahaya(hour: float) -> float:
-    # Gelap malam, naik saat matahari terbit (~06:00), puncak jam 10:00+
     if hour < 6.0:
         val = 500 + random.uniform(0, 300)
     elif hour < 10.0:
@@ -62,11 +76,27 @@ def _sensor_cahaya(hour: float) -> float:
         val = 45000 + random.uniform(-1500, 1500)
     return round(max(0, val))
 
-def _sensor_daya() -> float:
-    # Gedung kosong: hanya standby (CCTV, router, lampu darurat)
-    # Tidak ada AC, tidak ada PC, tidak ada orang
-    return round(random.choice([185.0, 195.0, 200.0, 215.0, 220.0, 250.0])
-                 + random.uniform(-10, 10), 1)
+def _sensor_gerakan(hour: float, aktif: bool) -> int:
+    if not aktif:
+        return 0
+    # Jam 07-08 mulai datang, 08-16 ramai, 16-17 pulang
+    if hour < 8.0:
+        return random.choices([0, 1], weights=[4, 6])[0]
+    elif hour < 16.0:
+        return 1
+    else:
+        return random.choices([0, 1], weights=[6, 4])[0]
+
+def _sensor_daya(hour: float, aktif: bool) -> float:
+    if aktif:
+        # AC + laptop + proyektor + lampu — ramping up 1 jam pertama
+        progress = min(1.0, max(0.0, (hour - 7.0) / 1.0))
+        base = 1500 + progress * 2500
+        return round(base + random.uniform(-200, 200), 1)
+    else:
+        # Standby: CCTV + router + lampu darurat
+        return round(random.choice([185.0, 195.0, 200.0, 215.0, 220.0])
+                     + random.uniform(-10, 10), 1)
 
 def _generator_loop():
     """Loop background: upload 1 data point ke InfluxDB Cloud tiap 5 menit."""
@@ -79,17 +109,18 @@ def _generator_loop():
 
     while True:
         try:
-            now = datetime.datetime.now()
-            hour = now.hour + now.minute / 60.0
-            ts   = int(now.timestamp())
+            now   = datetime.datetime.now()
+            hour  = now.hour + now.minute / 60.0
+            ts    = int(now.timestamp())
+            aktif = _is_active_hour(now)
 
             line = (
                 f"smart_room,lokasi=Ruang_Kelas_A "
-                f"suhu={_sensor_suhu(hour)},"
-                f"kelembaban={_sensor_kelembaban(hour)},"
+                f"suhu={_sensor_suhu(hour, aktif)},"
+                f"kelembaban={_sensor_kelembaban(hour, aktif)},"
                 f"cahaya={_sensor_cahaya(hour)},"
-                f"gerakan=0,"
-                f"daya_listrik={_sensor_daya()} "
+                f"gerakan={_sensor_gerakan(hour, aktif)},"
+                f"daya_listrik={_sensor_daya(hour, aktif)} "
                 f"{ts}"
             )
 
