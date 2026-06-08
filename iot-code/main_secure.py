@@ -243,7 +243,15 @@ while True:
         
         print(">> Mengirim data terenkripsi via API Gateway (HTTPS)...")
 
-        # [DEBUG] Test GET dulu sebelum POST
+        # [DEBUG] Test HTTPS ke domain berbeda untuk isolasi masalah
+        print("   [DBG 0] Test HTTPS ke httpbin.org...")
+        try:
+            _h = requests.get("https://httpbin.org/get", headers={"Connection": "close"})
+            print("   [DBG 0] httpbin OK - status:", _h.status_code)
+            _h.close()
+        except Exception as _e:
+            print("   [DBG 0] httpbin GAGAL:", type(_e).__name__, str(_e))
+
         print("   [DBG 1] Test GET /get_command...")
         try:
             _t = requests.get(GATEWAY_URL + "/get_command", headers={"Connection": "close"})
