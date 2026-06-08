@@ -1,4 +1,5 @@
 import network
+import ujson
 import urequests as requests
 from machine import ADC, Pin, I2C
 from time import sleep
@@ -238,7 +239,7 @@ while True:
             res_write = requests.post(
                 GATEWAY_URL + "/write",
                 headers=headers,
-                json=json_payload
+                data=ujson.dumps(json_payload)
             )
             print(">> Status HTTP Gateway:", res_write.status_code)
             # =======
