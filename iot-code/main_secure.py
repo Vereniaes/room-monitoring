@@ -55,7 +55,7 @@ SECURE_TOKEN = "token_aman_smartroom_2026"                 # Bearer Token
 #   sebagai Device ID: import network; mac = network.WLAN().config('mac')
 # - Token pairing antar device: SECURE_TOKEN + DEVICE_ID harus cocok di server
 # ======
-DEVICE_ID = "PICO-W-CLASS-A"  # ID unik perangkat - divalidasi API Gateway
+DEVICE_ID = "pico-room-a"  # ID unik perangkat - divalidasi API Gateway
 # =======
 # DONE CHECKLIST A (Device Authentication)
 # =======
