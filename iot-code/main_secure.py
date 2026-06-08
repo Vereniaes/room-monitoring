@@ -33,8 +33,8 @@ password = ""  # Di produksi: "K@mpus_S3kur3_2026!" (WPA2 strong password)
 #   dengan payload {"sub": DEVICE_ID, "exp": timestamp+3600}
 # ======
 # --- KONFIGURASI API GATEWAY ---
-# Ganti URL ini dengan URL Cloud Run service yang sudah di-deploy
-GATEWAY_URL = "https://iot-dashboard-xxxx-ue.a.run.app"   # Update ke URL Cloud Run kamu
+# Cloud Run URL — gateway diakses via nginx reverse proxy pada path /write, /get_command, dll
+GATEWAY_URL = "https://room-monitoring-476404504908.asia-southeast2.run.app"
 SECURE_TOKEN = "token_aman_smartroom_2026"                 # Bearer Token
 
 # --- REFERENSI INFLUXDB CLOUD (dipakai oleh API Gateway, bukan langsung oleh device) ---

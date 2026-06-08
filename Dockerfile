@@ -17,9 +17,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# --- Install dependencies (semua: streamlit + flask + gunicorn) ---
+# --- Install dependencies (semua: streamlit + flask + gunicorn + nginx) ---
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
+RUN apt-get update && apt-get install -y --no-install-recommends nginx \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 # --- Copy semua source code ---
@@ -27,6 +29,7 @@ COPY email_helper.py        .
 COPY api_gateway.py         .
 COPY settings.json          .
 COPY start.sh               .
+COPY nginx.conf             .
 COPY .streamlit/            .streamlit/
 COPY dashboard/dashboard.py                          dashboard/dashboard.py
 COPY dashboard/data_sensor_1_minggu_lineprotocol.txt dashboard/data_sensor_1_minggu_lineprotocol.txt
