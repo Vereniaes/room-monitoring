@@ -34,9 +34,9 @@ password = ""  # Di produksi: "K@mpus_S3kur3_2026!" (WPA2 strong password)
 #   dengan payload {"sub": DEVICE_ID, "exp": timestamp+3600}
 # ======
 # --- KONFIGURASI API GATEWAY ---
-# Cloudflare Worker sebagai proxy — Wokwi tidak kompatibel langsung ke Cloud Run
-# karena HTTP/2 ALPN issue. Worker di Cloudflare (Wokwi-compatible) forward ke Cloud Run.
-GATEWAY_URL = "https://lucky-thunder-9c26.titasaripratiwi8.workers.dev"
+# Pinggy HTTPS tunnel → forward ke api_gateway.py lokal port 5000
+# ⚠️  URL berubah tiap sesi (expire 60 mnt) — update setiap kali buka tunnel baru
+GATEWAY_URL = "https://miiby-103-154-78-157.free.pinggy.net"
 SECURE_TOKEN = "token_aman_smartroom_2026"                 # Bearer Token
 
 # --- REFERENSI INFLUXDB CLOUD (dipakai oleh API Gateway, bukan langsung oleh device) ---
@@ -244,37 +244,18 @@ while True:
         
         print(">> Mengirim data terenkripsi via API Gateway (HTTPS)...")
 
-        # [DEBUG] Test HTTPS ke domain berbeda untuk isolasi masalah
-        print("   [DBG 0] Test HTTPS ke httpbin.org...")
-        try:
-            _h = requests.get("https://httpbin.org/get", headers={"Connection": "close"})
-            print("   [DBG 0] httpbin OK - status:", _h.status_code)
-            _h.close()
-        except Exception as _e:
-            print("   [DBG 0] httpbin GAGAL:", type(_e).__name__, str(_e))
 
-        print("   [DBG 1] Test GET /get_command...")
-        try:
-            _t = requests.get(GATEWAY_URL + "/get_command", headers={"Connection": "close"})
-            print("   [DBG 1] GET status:", _t.status_code)
-            _t.close()
-        except Exception as _e:
-            print("   [DBG 1] GET GAGAL:", type(_e).__name__, str(_e))
-
-        print("   [DBG 2] Mulai POST /write ...")
         try:
             # ======
             # CHECKLIST B: HTTPS / SSL/TLS
-            # - Request dikirim ke HTTPS endpoint (Cloud Run SSL/TLS)
+            # - Request dikirim ke HTTPS endpoint (Pinggy tunnel → api_gateway lokal)
             # - Data dalam transit dilindungi enkripsi TLS end-to-end
             # ======
-            print("   [DBG 3] Sending request...")
             res_write = requests.post(
                 GATEWAY_URL + "/write",
                 headers=headers,
                 data=ujson.dumps(json_payload)
             )
-            print("   [DBG 4] Response received!")
             print(">> Status HTTP Gateway:", res_write.status_code)
             # =======
             # DONE CHECKLIST B (HTTPS/TLS - applied)
