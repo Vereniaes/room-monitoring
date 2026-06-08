@@ -34,8 +34,9 @@ password = ""  # Di produksi: "K@mpus_S3kur3_2026!" (WPA2 strong password)
 #   dengan payload {"sub": DEVICE_ID, "exp": timestamp+3600}
 # ======
 # --- KONFIGURASI API GATEWAY ---
-# Cloud Run URL — gateway diakses via nginx reverse proxy pada path /write, /get_command, dll
-GATEWAY_URL = "https://room-monitoring-476404504908.asia-southeast2.run.app"
+# Cloudflare Worker sebagai proxy — Wokwi tidak kompatibel langsung ke Cloud Run
+# karena HTTP/2 ALPN issue. Worker di Cloudflare (Wokwi-compatible) forward ke Cloud Run.
+GATEWAY_URL = "https://lucky-thunder-9c26.titasaripratiwi8.workers.dev"
 SECURE_TOKEN = "token_aman_smartroom_2026"                 # Bearer Token
 
 # --- REFERENSI INFLUXDB CLOUD (dipakai oleh API Gateway, bukan langsung oleh device) ---
