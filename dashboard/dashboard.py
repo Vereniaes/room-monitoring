@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import json
+import random
+import threading
 import datetime
 import hashlib
 import pandas as pd
@@ -28,6 +30,105 @@ INFLUXDB_URL    = os.environ.get("INFLUXDB_URL",    "")
 INFLUXDB_TOKEN  = os.environ.get("INFLUXDB_TOKEN",  "")
 INFLUXDB_ORG    = os.environ.get("INFLUXDB_ORG",    "")
 INFLUXDB_BUCKET = os.environ.get("INFLUXDB_BUCKET", "")
+
+# ======
+# BACKGROUND DATA GENERATOR
+# -> generate + upload 1 data point tiap 5 menit ke InfluxDB Cloud
+# -> pola: gedung kosong (Minggu/libur) — gerakan=0, daya standby
+# -> thread dimulai sekali saat container start (module-level lock)
+# ======
+
+_generator_lock   = threading.Lock()
+_generator_started = False
+
+def _sensor_suhu(hour: float) -> float:
+    # Pagi mulai ~26°C, naik ~0.5°C per jam sampai siang
+    base = 26.0 + max(0, (hour - 6)) * 0.5
+    return round(min(35.0, base + random.uniform(-0.3, 0.3)), 1)
+
+def _sensor_kelembaban(hour: float) -> float:
+    # Pagi lembab ~82%, turun ke ~65% siang hari
+    base = 82 - max(0, (hour - 6)) * 1.8
+    return int(max(55, min(90, base + random.uniform(-2, 2))))
+
+def _sensor_cahaya(hour: float) -> float:
+    # Gelap malam, naik saat matahari terbit (~06:00), puncak jam 10:00+
+    if hour < 6.0:
+        val = 500 + random.uniform(0, 300)
+    elif hour < 10.0:
+        progress = (hour - 6.0) / 4.0
+        val = 2000 + progress * 43000 + random.uniform(-500, 500)
+    else:
+        val = 45000 + random.uniform(-1500, 1500)
+    return round(max(0, val))
+
+def _sensor_daya() -> float:
+    # Gedung kosong: hanya standby (CCTV, router, lampu darurat)
+    # Tidak ada AC, tidak ada PC, tidak ada orang
+    return round(random.choice([185.0, 195.0, 200.0, 215.0, 220.0, 250.0])
+                 + random.uniform(-10, 10), 1)
+
+def _generator_loop():
+    """Loop background: upload 1 data point ke InfluxDB Cloud tiap 5 menit."""
+    # Tunggu sampai detik ke-0 interval 5 menit berikutnya (supaya aligned ke :00,:05,:10,...)
+    now = datetime.datetime.now()
+    wait_sec = (5 * 60) - (now.minute % 5) * 60 - now.second
+    if wait_sec <= 0:
+        wait_sec += 5 * 60
+    time.sleep(wait_sec)
+
+    while True:
+        try:
+            now = datetime.datetime.now()
+            hour = now.hour + now.minute / 60.0
+            ts   = int(now.timestamp())
+
+            line = (
+                f"smart_room,lokasi=Ruang_Kelas_A "
+                f"suhu={_sensor_suhu(hour)},"
+                f"kelembaban={_sensor_kelembaban(hour)},"
+                f"cahaya={_sensor_cahaya(hour)},"
+                f"gerakan=0,"
+                f"daya_listrik={_sensor_daya()} "
+                f"{ts}"
+            )
+
+            if INFLUXDB_URL and INFLUXDB_TOKEN and INFLUXDB_ORG and INFLUXDB_BUCKET:
+                from influxdb_client import InfluxDBClient
+                from influxdb_client.client.write_api import SYNCHRONOUS
+                client = InfluxDBClient(
+                    url=INFLUXDB_URL,
+                    token=INFLUXDB_TOKEN,
+                    org=INFLUXDB_ORG,
+                    timeout=10_000
+                )
+                client.write_api(write_options=SYNCHRONOUS).write(
+                    bucket=INFLUXDB_BUCKET,
+                    org=INFLUXDB_ORG,
+                    record=line,
+                    write_precision="s"
+                )
+                client.close()
+        except Exception:
+            pass  # jangan crash container kalau InfluxDB sesaat tidak tersedia
+
+        time.sleep(5 * 60)  # tunggu 5 menit
+
+def _start_generator():
+    """Mulai background generator — hanya 1x per proses server."""
+    global _generator_started
+    with _generator_lock:
+        if not _generator_started:
+            _generator_started = True
+            t = threading.Thread(target=_generator_loop, daemon=True, name="data-generator")
+            t.start()
+
+# Langsung panggil saat module di-load (sekali saja)
+_start_generator()
+
+# =======
+# DONE BACKGROUND DATA GENERATOR
+# =======
 
 # Menambahkan parent directory (folder root proyek) ke sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

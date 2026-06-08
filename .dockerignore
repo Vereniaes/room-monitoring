@@ -28,6 +28,7 @@ iot-code/
 # Script utility (tidak perlu di production)
 upload_dummy_data.py
 attack_simulator.py
+generate_minggu_pagi.py
 
 # Log lokal
 *.log
