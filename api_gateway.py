@@ -42,18 +42,13 @@ DEFAULT_PASSWORD = "admin123"  # Menyimulasikan celah keamanan lama (VULNERABLE 
 # ======
 # CHECKLIST A: Device Authentication
 # - Device ID validation: Setiap request wajib membawa header X-Device-ID yang cocok
-# - Token pairing antar device: SECURE_TOKEN dipasangkan khusus dengan DEVICE_ID "pico-room-a"
+# - Token pairing antar device: SECURE_TOKEN dipasangkan khusus dengan DEVICE_ID "PICO-W-CLASS-A"
 # ======
 # ID perangkat yang sah (hanya device ini yang diizinkan menulis data)
-REGISTERED_DEVICE_ID = "pico-room-a"
+REGISTERED_DEVICE_ID = "PICO-W-CLASS-A"
 # =======
 # DONE CHECKLIST A (Device Authentication)
 # =======
-
-# URL Cloud Run dashboard — dipakai local gateway untuk sync device_sessions ke dashboard
-# - di Cloud Run: kosong (tidak perlu sync ke diri sendiri)
-# - di local gateway: isi dengan URL Cloud Run agar device_sessions sinkron
-CLOUD_RUN_URL = os.environ.get("CLOUD_RUN_URL", "")
 
 # Konfigurasi InfluxDB Cloud (dibaca dari env var)
 # - INFLUXDB_URL    : https://us-east-1-1.aws.cloud2.influxdata.com
@@ -65,6 +60,11 @@ _influx_org   = os.environ.get("INFLUXDB_ORG", "")
 _influx_bucket= os.environ.get("INFLUXDB_BUCKET", "")
 INFLUX_URL    = f"{_influx_base}/api/v2/write?org={_influx_org}&bucket={_influx_bucket}&precision=s"
 INFLUX_TOKEN  = os.environ.get("INFLUXDB_TOKEN", "")
+
+# URL Cloud Run gateway untuk sinkronisasi device_sessions dari local gateway
+# - Di lokal (.env): set ke Cloud Run URL supaya device yang connect via Pinggy tetap terlihat di dashboard
+# - Di Cloud Run: biarkan kosong (tidak perlu sync balik)
+SYNC_GATEWAY_URL = os.environ.get("SYNC_GATEWAY_URL", "").rstrip("/")
 
 # --- STATE DATABASE DALAM MEMORI (IN-MEMORY) ---
 failed_attempts = {}    # {ip: count} — melacak percobaan gagal per IP
@@ -124,29 +124,6 @@ def decrypt_payload(hex_str, key=SHARED_KEY):
 # =======
 # DONE CHECKLIST B (Payload Encryption)
 # =======
-
-# helper --------------------------------------------------------------------------
-
-# fungsi sync device session dari local gateway ke Cloud Run dashboard
-# - input  : device_id (str), ip (str), first_seen (str ISO format)
-# - output : void — fire-and-forget via thread, tidak memblokir response
-def _notify_dashboard_session(device_id, ip, first_seen_str):
-    if not CLOUD_RUN_URL:
-        return  # skip jika tidak ada URL (Cloud Run tidak sync ke diri sendiri)
-    def _send():
-        try:
-            requests.post(
-                CLOUD_RUN_URL + "/notify_session",
-                json={"device_id": device_id, "ip": ip, "first_seen": first_seen_str},
-                headers={"Authorization": f"Bearer {SECURE_TOKEN}"},
-                timeout=5
-            )
-        except Exception:
-            pass  # fire-and-forget — abaikan error jaringan
-    import threading
-    threading.Thread(target=_send, daemon=True).start()
-
-# end of helper ------------------------------------------------------------------
 
 # ======
 # CHECKLIST C: Alert System
@@ -351,9 +328,20 @@ def write_data():
         }
         res_influx = requests.post(INFLUX_URL, headers=headers, data=decrypted_line_protocol, timeout=5)
         log_event("INFO", ip, "FORWARD", f"INFLUXDB_{res_influx.status_code}", "Sukses meneruskan data ke database.")
-        # Sync device session ke Cloud Run dashboard (fire-and-forget)
-        first_seen_str = device_sessions[device_id]["first_seen"].strftime("%Y-%m-%d %H:%M:%S")
-        _notify_dashboard_session(device_id, ip, first_seen_str)
+
+        # Sync device session ke Cloud Run gateway agar dashboard bisa lihat device
+        # - Hanya jalan di local gateway (SYNC_GATEWAY_URL di-set di .env lokal)
+        # - Gagal sync tidak mengganggu alur utama
+        if SYNC_GATEWAY_URL:
+            try:
+                requests.post(
+                    f"{SYNC_GATEWAY_URL}/notify_session",
+                    json={"device_id": device_id, "ip": ip},
+                    timeout=3
+                )
+            except Exception:
+                pass
+
         # Return 200 + JSON (bukan 204) — urequests MicroPython hang pada 204 No Content
         # karena tidak ada body/Content-Length untuk menandai akhir response
         return jsonify({"status": "ok", "code": res_influx.status_code}), 200
@@ -432,35 +420,6 @@ def get_device_sessions():
     return jsonify(result)
 
 
-# --- ENDPOINT TAMBAHAN: SYNC SESSION DARI LOCAL GATEWAY (/notify_session) ---
-# - Dipanggil oleh local gateway (via Pinggy) setelah menerima data dari Wokwi
-# - Update device_sessions di Cloud Run agar dashboard tampilkan device sebagai connected
-@app.route("/notify_session", methods=["POST"])
-def notify_session():
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer ") or auth.split(" ", 1)[1] != SECURE_TOKEN:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.get_json()
-    if not data or "device_id" not in data:
-        return jsonify({"error": "Bad Request"}), 400
-
-    dev_id  = data["device_id"]
-    dev_ip  = data.get("ip", "unknown")
-    now     = datetime.datetime.now()
-
-    existing = device_sessions.get(dev_id)
-    if existing is None:
-        device_sessions[dev_id] = {"ip": dev_ip, "first_seen": now, "last_seen": now}
-        log_event("INFO", dev_ip, "NOTIFY_SESSION", "NEW", f"Device '{dev_id}' terdaftar via sync dari local gateway.")
-    else:
-        device_sessions[dev_id]["last_seen"] = now
-        device_sessions[dev_id]["ip"] = dev_ip
-        log_event("INFO", dev_ip, "NOTIFY_SESSION", "UPDATE", f"Device '{dev_id}' last_seen diperbarui via sync.")
-
-    return jsonify({"status": "ok"}), 200
-
-
 # --- ENDPOINT TAMBAHAN: SWITCH SECURITY MODE (Untuk Simulasi Presentasi) ---
 @app.route("/toggle_security", methods=["POST"])
 def toggle_security():
@@ -479,6 +438,40 @@ def unblock_ips():
     failed_attempts.clear()
     log_event("INFO", request.remote_addr, "UNBLOCK_IPS", "RESET", "Semua daftar blokir IP dibersihkan.")
     return jsonify({"status": "reset", "message": "All blocked IPs cleared."})
+
+
+# --- ENDPOINT TAMBAHAN: NOTIFY SESSION (Sinkronisasi Device dari Local Gateway ke Cloud Run) ---
+# - Dipanggil oleh local gateway setelah device berhasil kirim data via Pinggy
+# - Memastikan device_sessions di Cloud Run (dashboard) selalu up-to-date
+# - Input : JSON {"device_id": str, "ip": str (opsional)}
+# - Output: JSON {"status": "ok", "device_id": str}
+@app.route("/notify_session", methods=["POST"])
+def notify_session():
+    req_json = request.get_json()
+    if not req_json or "device_id" not in req_json:
+        return jsonify({"error": "device_id required"}), 400
+
+    device_id = req_json["device_id"]
+    ip        = req_json.get("ip", request.remote_addr)
+    now       = datetime.datetime.now()
+
+    if device_id in device_sessions:
+        # Update last_seen — refresh status online
+        device_sessions[device_id]["last_seen"] = now
+        device_sessions[device_id]["ip"]        = ip
+        status = "UPDATED"
+    else:
+        # Device baru — registrasi sesi
+        device_sessions[device_id] = {
+            "ip":         ip,
+            "first_seen": now,
+            "last_seen":  now
+        }
+        status = "REGISTERED"
+
+    log_event("INFO", ip, "NOTIFY_SESSION", status,
+              f"Device '{device_id}' di-sync dari local gateway via Pinggy.")
+    return jsonify({"status": "ok", "device_id": device_id}), 200
 
 
 if __name__ == "__main__":
