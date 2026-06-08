@@ -124,13 +124,14 @@ def connect_wifi():
             print("\n[ERROR] WiFi timeout! Restarting...")
             lcd.clear()
             lcd.putstr("WiFi TIMEOUT!")
-            break
+            return wlan  # kembalikan meski belum connected — main loop yang handle
     
     if wlan.isconnected():
         print("\n[OK] WiFi Connected! IP:", wlan.ifconfig()[0])
         lcd.clear()
         lcd.putstr("WiFi Connected!")
-    sleep(2)
+        sleep(5)  # tunggu DNS dan stack jaringan siap (harus ≥ 3 detik)
+    return wlan
 # =======
 # DONE CHECKLIST B (Secure WiFi Layer - connect function)
 # =======
@@ -151,7 +152,7 @@ def check_sensors():
 
 
 # Mulai koneksi WiFi saat boot
-connect_wifi()
+wlan = connect_wifi()
 
 # ======
 # CHECKLIST C: Activity Logging (sisi device)
@@ -167,6 +168,17 @@ fail_count = 0      # Counter jumlah pengiriman gagal
 
 # --- MAIN LOOP ---
 while True:
+    # Cek WiFi sebelum apapun — reconnect kalau putus
+    if not wlan.isconnected():
+        print("[WARN] WiFi putus, mencoba reconnect...")
+        lcd.clear()
+        lcd.putstr("Reconnecting...")
+        wlan = connect_wifi()
+        if not wlan.isconnected():
+            print("[ERROR] Reconnect gagal, skip siklus ini.")
+            sleep(5)
+            continue
+
     temp, hum, ldr_val, pir_event = check_sensors()
 
     # Logika lokal cahaya dan gerak
