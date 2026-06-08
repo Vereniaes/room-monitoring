@@ -243,17 +243,29 @@ while True:
         
         print(">> Mengirim data terenkripsi via API Gateway (HTTPS)...")
 
+        # [DEBUG] Test GET dulu sebelum POST
+        print("   [DBG 1] Test GET /get_command...")
+        try:
+            _t = requests.get(GATEWAY_URL + "/get_command", headers={"Connection": "close"})
+            print("   [DBG 1] GET status:", _t.status_code)
+            _t.close()
+        except Exception as _e:
+            print("   [DBG 1] GET GAGAL:", type(_e).__name__, str(_e))
+
+        print("   [DBG 2] Mulai POST /write ...")
         try:
             # ======
             # CHECKLIST B: HTTPS / SSL/TLS
             # - Request dikirim ke HTTPS endpoint (Cloud Run SSL/TLS)
             # - Data dalam transit dilindungi enkripsi TLS end-to-end
             # ======
+            print("   [DBG 3] Sending request...")
             res_write = requests.post(
                 GATEWAY_URL + "/write",
                 headers=headers,
                 data=ujson.dumps(json_payload)
             )
+            print("   [DBG 4] Response received!")
             print(">> Status HTTP Gateway:", res_write.status_code)
             # =======
             # DONE CHECKLIST B (HTTPS/TLS - applied)
@@ -284,6 +296,7 @@ while True:
             res_write.close()
         except Exception as e:
             fail_count += 1
+            print("   [DBG ERR] Type:", type(e).__name__, "| Detail:", str(e))
             print("   ❌ [KONEKSI ERROR] Gagal menghubungi API Gateway:", e)
             print("   📊 Total gagal: {}".format(fail_count))
 
