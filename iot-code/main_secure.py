@@ -264,7 +264,7 @@ while True:
             # - Catat status pengiriman: sukses atau gagal dengan kode HTTP
             # - Counter send_count / fail_count diperbarui setiap siklus
             # ======
-            if res_write.status_code == 204:
+            if res_write.status_code == 200:
                 send_count += 1
                 print("   ✅ [AMAN] Data sensor sukses didekripsi & disimpan ke InfluxDB!")
                 print("   📊 Total berhasil kirim: {}".format(send_count))

@@ -323,7 +323,9 @@ def write_data():
         }
         res_influx = requests.post(INFLUX_URL, headers=headers, data=decrypted_line_protocol, timeout=5)
         log_event("INFO", ip, "FORWARD", f"INFLUXDB_{res_influx.status_code}", "Sukses meneruskan data ke database.")
-        return "", res_influx.status_code
+        # Return 200 + JSON (bukan 204) — urequests MicroPython hang pada 204 No Content
+        # karena tidak ada body/Content-Length untuk menandai akhir response
+        return jsonify({"status": "ok", "code": res_influx.status_code}), 200
     except Exception as e:
         log_event("CRITICAL", ip, "FORWARD", "INFLUXDB_ERROR", f"Gagal tersambung ke InfluxDB: {e}")
         return jsonify({"error": "Database Error", "message": "Could not forward to InfluxDB."}), 500
